@@ -2,13 +2,14 @@ import { useState, useMemo } from 'react';
 import { useAppStore } from '../../store/useAppStore';
 import { calculatePayroll } from '../../services/payroll/calculator';
 import { formatKRW, formatMinutes } from '../../utils/format';
-import type { DailyResult } from '../../types';
+import type { DailyResult, WeeklyHolidayResult } from '../../types';
 
-function toCSV(daily: DailyResult[]): string {
+function toCSV(daily: DailyResult[], holidayPay: number): string {
   const header = '날짜,총근무(분),정규(분),연장(분),야간(분),시급,급여';
   const rows = daily.map((d) =>
     [d.date, d.totalMinutes, d.regularMinutes, d.overtimeMinutes, d.nightMinutes, d.hourlyWage, d.pay].join(','),
   );
+  if (holidayPay > 0) rows.push(`주휴수당,,,,,,${holidayPay}`);
   return [header, ...rows].join('\n');
 }
 
@@ -43,7 +44,6 @@ export default function PayrollPage() {
 
   const { from, to } = mode === 'month' ? getMonthRange(selectedMonth) : { from: customFrom, to: customTo };
 
-  // 이전달 / 다음달 이동
   function shiftMonth(delta: number) {
     const [y, m] = selectedMonth.split('-').map(Number);
     const d = new Date(y, m - 1 + delta, 1);
@@ -58,16 +58,25 @@ export default function PayrollPage() {
   }, [entries, wageRates, settings, from, to]);
 
   const filteredDaily = useMemo(
-    () => result?.daily.filter((d) => d.date >= from && d.date <= to) ?? [],
+    (): DailyResult[] => result?.daily.filter((d) => d.date >= from && d.date <= to) ?? [],
+    [result, from, to],
+  );
+
+  // 주휴수당: 기간 내 주(週) 기준으로 필터
+  const filteredWeekly = useMemo(
+    (): WeeklyHolidayResult[] => result?.weekly.filter((w) => w.weekEnd >= from && w.weekStart <= to) ?? [],
     [result, from, to],
   );
 
   const totals = useMemo(() => ({
-    pay: filteredDaily.reduce((s, d) => s + d.pay, 0),
-    minutes: filteredDaily.reduce((s, d) => s + d.totalMinutes, 0),
-    overtime: filteredDaily.reduce((s, d) => s + d.overtimeMinutes, 0),
-    night: filteredDaily.reduce((s, d) => s + d.nightMinutes, 0),
-  }), [filteredDaily]);
+    workPay: filteredDaily.reduce((s: number, d: DailyResult) => s + d.pay, 0),
+    holidayPay: filteredWeekly.reduce((s: number, w: WeeklyHolidayResult) => s + w.holidayPay, 0),
+    minutes: filteredDaily.reduce((s: number, d: DailyResult) => s + d.totalMinutes, 0),
+    overtime: filteredDaily.reduce((s: number, d: DailyResult) => s + d.overtimeMinutes, 0),
+    night: filteredDaily.reduce((s: number, d: DailyResult) => s + d.nightMinutes, 0),
+  }), [filteredDaily, filteredWeekly]);
+
+  const totalPay = totals.workPay + totals.holidayPay;
 
   const inputCls = 'border border-gray-300 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400';
   const tabCls = (active: boolean) =>
@@ -79,7 +88,6 @@ export default function PayrollPage() {
 
       {/* 기간 선택 */}
       <div className="bg-white border border-gray-200 rounded-lg p-4 space-y-3">
-        {/* 모드 탭 */}
         <div className="flex gap-1 bg-gray-100 rounded-lg p-1 w-fit">
           <button className={tabCls(mode === 'month')} onClick={() => setMode('month')}>월 단위</button>
           <button className={tabCls(mode === 'custom')} onClick={() => setMode('custom')}>직접 설정</button>
@@ -114,7 +122,7 @@ export default function PayrollPage() {
         {filteredDaily.length > 0 && (
           <div className="pt-1">
             <button
-              onClick={() => downloadCSV(toCSV(filteredDaily), `급여_${from}_${to}.csv`)}
+              onClick={() => downloadCSV(toCSV(filteredDaily, totals.holidayPay), `급여_${from}_${to}.csv`)}
               className="px-3 py-1.5 text-sm rounded-md border border-gray-300 text-gray-600 hover:bg-gray-50"
             >
               CSV 다운로드
@@ -132,7 +140,7 @@ export default function PayrollPage() {
           {/* 총합 카드 */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             {[
-              { label: '총 급여', value: formatKRW(totals.pay), color: 'text-blue-600' },
+              { label: '총 수령액', value: formatKRW(totalPay), color: 'text-blue-600' },
               { label: '총 근무시간', value: formatMinutes(totals.minutes), color: 'text-green-600' },
               { label: '연장 근무', value: totals.overtime > 0 ? formatMinutes(totals.overtime) : '-', color: 'text-orange-500' },
               { label: '야간 근무', value: totals.night > 0 ? formatMinutes(totals.night) : '-', color: 'text-indigo-500' },
@@ -144,7 +152,63 @@ export default function PayrollPage() {
             ))}
           </div>
 
-          {/* 월별 표 (기간이 여러 달일 때만) */}
+          {/* 급여 분류 카드 */}
+          <div className="bg-white border border-gray-200 rounded-lg p-4">
+            <h2 className="text-sm font-semibold text-gray-700 mb-3">급여 구성</h2>
+            <div className="space-y-2">
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-600">근로 급여</span>
+                <span className="font-medium text-gray-800">{formatKRW(totals.workPay)}</span>
+              </div>
+              {settings.weeklyHolidayPay && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-600">주휴수당 ({filteredWeekly.length}주)</span>
+                  <span className="font-medium text-green-700">{formatKRW(totals.holidayPay)}</span>
+                </div>
+              )}
+              {!settings.weeklyHolidayPay && (
+                <div className="flex justify-between text-sm text-gray-400">
+                  <span>주휴수당</span>
+                  <span>설정에서 활성화 가능</span>
+                </div>
+              )}
+              <div className="border-t border-gray-100 pt-2 flex justify-between text-sm font-semibold">
+                <span className="text-gray-800">합계</span>
+                <span className="text-blue-700">{formatKRW(totalPay)}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* 주휴수당 주별 내역 */}
+          {settings.weeklyHolidayPay && filteredWeekly.length > 0 && (
+            <section>
+              <h2 className="text-sm font-semibold text-gray-700 mb-2">주휴수당 내역</h2>
+              <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-50 text-gray-600">
+                    <tr>
+                      <th className="text-left px-4 py-2">기간</th>
+                      <th className="text-right px-4 py-2">주간 근무시간</th>
+                      <th className="text-right px-4 py-2">시급</th>
+                      <th className="text-right px-4 py-2">주휴수당</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {filteredWeekly.map((w) => (
+                      <tr key={w.weekStart} className="hover:bg-gray-50">
+                        <td className="px-4 py-2 text-gray-700">{w.weekStart} ~ {w.weekEnd}</td>
+                        <td className="px-4 py-2 text-right text-gray-600">{formatMinutes(w.workedMinutes)}</td>
+                        <td className="px-4 py-2 text-right text-gray-500">{w.hourlyWage.toLocaleString()}원</td>
+                        <td className="px-4 py-2 text-right font-medium text-green-700">{formatKRW(w.holidayPay)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          )}
+
+          {/* 월별 표 */}
           {result && result.monthly.length > 1 && (
             <section>
               <h2 className="text-sm font-semibold text-gray-700 mb-2">월별 집계</h2>
@@ -154,7 +218,7 @@ export default function PayrollPage() {
                     <tr>
                       <th className="text-left px-4 py-2">월</th>
                       <th className="text-right px-4 py-2">근무시간</th>
-                      <th className="text-right px-4 py-2">급여</th>
+                      <th className="text-right px-4 py-2">근로급여</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
@@ -205,7 +269,7 @@ export default function PayrollPage() {
                     <td className="px-4 py-2 text-right text-orange-500">{totals.overtime > 0 ? formatMinutes(totals.overtime) : '-'}</td>
                     <td className="px-4 py-2 text-right text-indigo-500">{totals.night > 0 ? formatMinutes(totals.night) : '-'}</td>
                     <td></td>
-                    <td className="px-4 py-2 text-right text-blue-700">{formatKRW(totals.pay)}</td>
+                    <td className="px-4 py-2 text-right text-blue-700">{formatKRW(totals.workPay)}</td>
                   </tr>
                 </tfoot>
               </table>
