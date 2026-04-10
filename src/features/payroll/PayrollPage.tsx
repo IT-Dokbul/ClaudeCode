@@ -5,9 +5,9 @@ import { formatKRW, formatMinutes } from '../../utils/format';
 import type { DailyResult, WeeklyHolidayResult } from '../../types';
 
 function toCSV(daily: DailyResult[], holidayPay: number): string {
-  const header = '날짜,총근무(분),정규(분),연장(분),야간(분),시급,급여';
+  const header = '날짜,공휴일,총근무(분),정규(분),연장(분),야간(분),시급,급여';
   const rows = daily.map((d) =>
-    [d.date, d.totalMinutes, d.regularMinutes, d.overtimeMinutes, d.nightMinutes, d.hourlyWage, d.pay].join(','),
+    [d.date, d.holidayName ?? '', d.totalMinutes, d.regularMinutes, d.overtimeMinutes, d.nightMinutes, d.hourlyWage, d.pay].join(','),
   );
   if (holidayPay > 0) rows.push(`주휴수당,,,,,,${holidayPay}`);
   return [header, ...rows].join('\n');
@@ -34,7 +34,7 @@ function getMonthRange(ym: string): { from: string; to: string } {
 type Mode = 'month' | 'custom';
 
 export default function PayrollPage() {
-  const { entries, wageRates, settings } = useAppStore();
+  const { entries, wageRates, settings, customHolidays } = useAppStore();
 
   const todayYM = new Date().toISOString().slice(0, 7);
   const [mode, setMode] = useState<Mode>('month');
@@ -54,8 +54,8 @@ export default function PayrollPage() {
     if (!entries.length) return null;
     const filtered = entries.filter((e) => e.endDate >= from && e.startDate <= to);
     if (!filtered.length) return null;
-    return calculatePayroll(filtered, wageRates, settings);
-  }, [entries, wageRates, settings, from, to]);
+    return calculatePayroll(filtered, wageRates, settings, customHolidays);
+  }, [entries, wageRates, settings, customHolidays, from, to]);
 
   const filteredDaily = useMemo(
     (): DailyResult[] => result?.daily.filter((d) => d.date >= from && d.date <= to) ?? [],
@@ -252,8 +252,15 @@ export default function PayrollPage() {
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {filteredDaily.map((d) => (
-                    <tr key={d.date} className="hover:bg-gray-50">
-                      <td className="px-4 py-2 text-gray-700">{d.date}</td>
+                    <tr key={d.date} className={`hover:bg-gray-50 ${d.isHoliday ? 'bg-red-50' : ''}`}>
+                      <td className="px-4 py-2 text-gray-700">
+                        <span>{d.date}</span>
+                        {d.isHoliday && (
+                          <span className="ml-2 inline-block px-1.5 py-0.5 text-xs rounded bg-red-100 text-red-600 font-medium">
+                            {d.holidayName}
+                          </span>
+                        )}
+                      </td>
                       <td className="px-4 py-2 text-right text-gray-600">{formatMinutes(d.regularMinutes)}</td>
                       <td className="px-4 py-2 text-right text-orange-500">{d.overtimeMinutes > 0 ? formatMinutes(d.overtimeMinutes) : '-'}</td>
                       <td className="px-4 py-2 text-right text-indigo-500">{d.nightMinutes > 0 ? formatMinutes(d.nightMinutes) : '-'}</td>

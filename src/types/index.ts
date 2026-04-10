@@ -18,21 +18,26 @@ export interface WageRate {
 }
 
 export interface PayrollSettings {
-  nightBonusRate: number;      // 0.5 = 50% 가산
-  overtimeBonusRate: number;   // 0.5
-  weeklyHolidayPay: boolean;   // 주휴수당 적용 여부
-  nightStartHour: number;      // 22
-  nightEndHour: number;        // 6
-  dailyWorkLimit: number;      // 8 (시간)
-  currency: string;            // 'KRW'
+  nightBonusRate: number;        // 0.5 = 50% 야간 가산
+  overtimeBonusRate: number;     // 0.5 = 50% 연장 가산
+  weeklyHolidayPay: boolean;     // 주휴수당 적용 여부
+  nightStartHour: number;        // 22
+  nightEndHour: number;          // 6
+  dailyWorkLimit: number;        // 8 (시간)
+  currency: string;              // 'KRW'
+  holidayPayEnabled: boolean;    // 공휴일 가산수당 적용
+  holidayBonusRate: number;      // 0.5 = 50%
+  weeklyOvertimeEnabled: boolean; // 주 40시간 초과 연장 추적
 }
 
 export interface DailyResult {
   date: string;               // 'YYYY-MM-DD'
   totalMinutes: number;
   regularMinutes: number;
-  overtimeMinutes: number;
+  overtimeMinutes: number;    // 일간 + 주간 연장 합산
   nightMinutes: number;
+  isHoliday: boolean;         // 법정 공휴일 여부
+  holidayName?: string;       // 공휴일 이름
   hourlyWage: number;
   pay: number;
 }
@@ -70,4 +75,7 @@ export const DEFAULT_SETTINGS: PayrollSettings = {
   nightEndHour: 6,
   dailyWorkLimit: 8,
   currency: 'KRW',
+  holidayPayEnabled: true,
+  holidayBonusRate: 0.5,
+  weeklyOvertimeEnabled: true,
 };

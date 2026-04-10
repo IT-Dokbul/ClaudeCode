@@ -6,7 +6,7 @@ import { formatKRW, formatMinutes } from '../../utils/format';
 import type { DailyResult } from '../../types';
 
 export default function DashboardPage() {
-  const { entries, wageRates, settings } = useAppStore();
+  const { entries, wageRates, settings, customHolidays } = useAppStore();
 
   const thisMonth = new Date().toISOString().slice(0, 7);
   const from = thisMonth + '-01';
@@ -15,8 +15,8 @@ export default function DashboardPage() {
   const result = useMemo(() => {
     const filtered = entries.filter((e) => e.endDate >= from && e.startDate <= to);
     if (!filtered.length) return null;
-    return calculatePayroll(filtered, wageRates, settings);
-  }, [entries, wageRates, settings, from, to]);
+    return calculatePayroll(filtered, wageRates, settings, customHolidays);
+  }, [entries, wageRates, settings, customHolidays, from, to]);
 
   const monthData = result?.monthly.find((m) => m.yearMonth === thisMonth);
   const dailyThisMonth: DailyResult[] = result?.daily.filter((d) => d.date >= from && d.date <= to) ?? [];

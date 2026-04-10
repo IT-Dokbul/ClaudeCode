@@ -19,6 +19,9 @@ const baseSettings: PayrollSettings = {
   nightEndHour: 6,
   dailyWorkLimit: 8,
   currency: 'KRW',
+  holidayPayEnabled: false,
+  holidayBonusRate: 0.5,
+  weeklyOvertimeEnabled: false,
 };
 
 function entry(overrides: Partial<WorkEntry> & Pick<WorkEntry, 'startDate' | 'endDate' | 'startTime' | 'endTime'>): WorkEntry {
@@ -220,5 +223,69 @@ describe('calculatePayroll', () => {
     expect(result.weekly).toHaveLength(1);
     // 주휴수당 = (20/40) * 8 * 10030 = 4 * 10030 = 40120
     expect(result.totalHolidayPay).toBe(Math.round(4 * 10030));
+  });
+
+  // 18. 공휴일 가산수당 (법정 공휴일 근무 +50%)
+  it('TC18: 공휴일(신정 2025-01-01) 8시간 근무 → holidayPayEnabled=true 시 +50% 가산', () => {
+    // 2025-01-01 신정 (FIXED_ANNUAL '01-01')
+    const e = entry({ startDate: '2025-01-01', endDate: '2025-01-01', startTime: '09:00', endTime: '17:00' });
+
+    const withHoliday = calculatePayroll([e], wageRates, { ...baseSettings, holidayPayEnabled: true, holidayBonusRate: 0.5 });
+    const withoutHoliday = calculatePayroll([e], wageRates, { ...baseSettings, holidayPayEnabled: false });
+
+    const d = withHoliday.daily[0];
+    expect(d.isHoliday).toBe(true);
+    expect(d.holidayName).toBe('신정');
+    // pay with holiday = (480 + 480*0.5) * 10030 / 60 = 720 * 10030 / 60
+    expect(d.pay).toBe(Math.round(720 * 10030 / 60));
+    // pay without = 480 * 10030 / 60
+    expect(withoutHoliday.daily[0].pay).toBe(Math.round(480 * 10030 / 60));
+    // holiday premium = 480 * 0.5 * 10030 / 60
+    expect(d.pay - withoutHoliday.daily[0].pay).toBe(Math.round(240 * 10030 / 60));
+  });
+
+  // 19. 공휴일 아닌 날 → isHoliday false
+  it('TC19: 일반 평일은 isHoliday=false', () => {
+    const e = entry({ startDate: '2025-01-02', endDate: '2025-01-02', startTime: '09:00', endTime: '17:00' });
+    const result = calculatePayroll([e], wageRates, { ...baseSettings, holidayPayEnabled: true });
+    expect(result.daily[0].isHoliday).toBe(false);
+    expect(result.daily[0].holidayName).toBeUndefined();
+  });
+
+  // 20. 주 40시간 초과 연장 (토요일 추가 근무)
+  it('TC20: 주 40시간 초과(월~금 40h + 토 4h) → 토요일 4시간 연장 처리', () => {
+    // 월~금 9~17 (8h/일 × 5 = 40h), 토 9~13 (4h)
+    const weekdays = entry({
+      id: 'weekdays', startDate: '2025-01-06', endDate: '2025-01-10',
+      startTime: '09:00', endTime: '17:00',
+    });
+    const saturday = entry({
+      id: 'saturday', startDate: '2025-01-11', endDate: '2025-01-11',
+      startTime: '09:00', endTime: '13:00',
+    });
+    const result = calculatePayroll([weekdays, saturday], wageRates, { ...baseSettings, weeklyOvertimeEnabled: true });
+
+    const sat = result.daily.find((d) => d.date === '2025-01-11')!;
+    expect(sat).toBeDefined();
+    // 토요일 4시간은 일간 기준으로는 정규(8h 한도 미달)지만 주간 40h 초과이므로 전부 연장
+    expect(sat.overtimeMinutes).toBe(240);
+    expect(sat.regularMinutes).toBe(0);
+  });
+
+  // 21. 주 40시간 초과 연장 비활성화 → 토요일 정규 처리
+  it('TC21: weeklyOvertimeEnabled=false → 토요일 4시간은 정규 처리', () => {
+    const weekdays = entry({
+      id: 'weekdays', startDate: '2025-01-06', endDate: '2025-01-10',
+      startTime: '09:00', endTime: '17:00',
+    });
+    const saturday = entry({
+      id: 'saturday', startDate: '2025-01-11', endDate: '2025-01-11',
+      startTime: '09:00', endTime: '13:00',
+    });
+    const result = calculatePayroll([weekdays, saturday], wageRates, { ...baseSettings, weeklyOvertimeEnabled: false });
+
+    const sat = result.daily.find((d) => d.date === '2025-01-11')!;
+    expect(sat.regularMinutes).toBe(240);
+    expect(sat.overtimeMinutes).toBe(0);
   });
 });
