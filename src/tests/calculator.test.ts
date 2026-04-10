@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { calculatePayroll } from '../services/payroll/calculator';
-import type { WorkEntry, WageRate, PayrollSettings } from '../types';
+import type { WorkEntry, WageRate, PayrollSettings, DailyResult } from '../types';
 
 // ─── 공통 픽스처 ───────────────────────────────────────────────────────────────
 
@@ -67,8 +67,8 @@ describe('calculatePayroll', () => {
 
     // 자정을 넘어 당일(23:00~00:00 = 60분)과 다음날(00:00~01:00 = 60분)로 분리
     expect(result.daily).toHaveLength(2);
-    const totalNight = result.daily.reduce((s, d) => s + d.nightMinutes, 0);
-    const totalMinutes = result.daily.reduce((s, d) => s + d.totalMinutes, 0);
+    const totalNight = result.daily.reduce((s: number, d: DailyResult) => s + d.nightMinutes, 0);
+    const totalMinutes = result.daily.reduce((s: number, d: DailyResult) => s + d.totalMinutes, 0);
     expect(totalNight).toBe(120);
     expect(totalMinutes).toBe(120);
     // 전 구간 야간이므로 pay = 120 * 1.5 * 10030 / 60
@@ -178,5 +178,47 @@ describe('calculatePayroll', () => {
     const result = calculatePayroll([e], wageRates, baseSettings);
     expect(result.daily[0].overtimeMinutes).toBe(0);
     expect(result.daily[0].regularMinutes).toBe(480);
+  });
+
+  // 14. 주휴수당 비활성화 → weekly 배열 비어있어야 함
+  it('TC14: weeklyHolidayPay=false → 주휴수당 없음', () => {
+    // 2025-01-06(월)~2025-01-10(금) 5일, 8시간씩 = 주 40시간
+    const e = entry({ startDate: '2025-01-06', endDate: '2025-01-10', startTime: '09:00', endTime: '17:00' });
+    const result = calculatePayroll([e], wageRates, { ...baseSettings, weeklyHolidayPay: false });
+    expect(result.weekly).toHaveLength(0);
+    expect(result.totalHolidayPay).toBe(0);
+    expect(result.totalPay).toBe(result.totalWorkPay);
+  });
+
+  // 15. 주휴수당 활성화, 주 40시간 → 8시간분 주휴수당
+  it('TC15: weeklyHolidayPay=true, 주 40시간 → 8시간분 주휴수당', () => {
+    // 2025-01-06(월)~2025-01-10(금) 5일, 8시간씩 = 40시간
+    const e = entry({ startDate: '2025-01-06', endDate: '2025-01-10', startTime: '09:00', endTime: '17:00' });
+    const result = calculatePayroll([e], wageRates, { ...baseSettings, weeklyHolidayPay: true });
+
+    expect(result.weekly).toHaveLength(1);
+    // 주휴수당 = (40/40) * 8 * 10030 = 80240
+    expect(result.totalHolidayPay).toBe(Math.round(8 * 10030));
+    expect(result.totalPay).toBe(result.totalWorkPay + result.totalHolidayPay);
+  });
+
+  // 16. 주 15시간 미만 → 주휴수당 없음
+  it('TC16: 주 15시간 미만(10시간) → 주휴수당 없음', () => {
+    // 2025-01-06(월)~2025-01-07(화) 2일, 5시간씩 = 10시간
+    const e = entry({ startDate: '2025-01-06', endDate: '2025-01-07', startTime: '09:00', endTime: '14:00' });
+    const result = calculatePayroll([e], wageRates, { ...baseSettings, weeklyHolidayPay: true });
+    expect(result.weekly).toHaveLength(0);
+    expect(result.totalHolidayPay).toBe(0);
+  });
+
+  // 17. 주 20시간 → 비례 주휴수당 (4시간분)
+  it('TC17: 주 20시간 → 비례 주휴수당 4시간분', () => {
+    // 2025-01-06(월)~2025-01-09(목) 4일, 5시간씩 = 20시간
+    const e = entry({ startDate: '2025-01-06', endDate: '2025-01-09', startTime: '09:00', endTime: '14:00' });
+    const result = calculatePayroll([e], wageRates, { ...baseSettings, weeklyHolidayPay: true });
+
+    expect(result.weekly).toHaveLength(1);
+    // 주휴수당 = (20/40) * 8 * 10030 = 4 * 10030 = 40120
+    expect(result.totalHolidayPay).toBe(Math.round(4 * 10030));
   });
 });

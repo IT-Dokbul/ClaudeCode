@@ -3,11 +3,12 @@ import { Link } from 'react-router-dom';
 import { useAppStore } from '../../store/useAppStore';
 import { calculatePayroll } from '../../services/payroll/calculator';
 import { formatKRW, formatMinutes } from '../../utils/format';
+import type { DailyResult } from '../../types';
 
 export default function DashboardPage() {
   const { entries, wageRates, settings } = useAppStore();
 
-  const thisMonth = new Date().toISOString().slice(0, 7); // 'YYYY-MM'
+  const thisMonth = new Date().toISOString().slice(0, 7);
   const from = thisMonth + '-01';
   const to = new Date().toISOString().slice(0, 10);
 
@@ -18,11 +19,12 @@ export default function DashboardPage() {
   }, [entries, wageRates, settings, from, to]);
 
   const monthData = result?.monthly.find((m) => m.yearMonth === thisMonth);
+  const dailyThisMonth: DailyResult[] = result?.daily.filter((d) => d.date >= from && d.date <= to) ?? [];
 
   const cards = [
     {
       label: '이번 달 예상 급여',
-      value: formatKRW(monthData?.pay ?? 0),
+      value: formatKRW((monthData?.pay ?? 0) + (result?.totalHolidayPay ?? 0)),
       color: 'text-blue-600',
     },
     {
@@ -32,7 +34,7 @@ export default function DashboardPage() {
     },
     {
       label: '이번 달 근무일수',
-      value: `${result?.daily.filter((d) => d.date >= from && d.date <= to).length ?? 0}일`,
+      value: `${dailyThisMonth.length}일`,
       color: 'text-purple-600',
     },
   ];

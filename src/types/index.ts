@@ -37,10 +37,21 @@ export interface DailyResult {
   pay: number;
 }
 
+export interface WeeklyHolidayResult {
+  weekStart: string;      // 해당 주 월요일 'YYYY-MM-DD'
+  weekEnd: string;        // 해당 주 일요일 'YYYY-MM-DD'
+  workedMinutes: number;  // 주간 실근무 분
+  hourlyWage: number;     // 적용 시급
+  holidayPay: number;     // 주휴수당
+}
+
 export interface PayrollResult {
   daily: DailyResult[];
+  weekly: WeeklyHolidayResult[];  // 주휴수당 내역
   monthly: { yearMonth: string; pay: number; minutes: number }[];
-  totalPay: number;
+  totalPay: number;        // 근로급여 + 주휴수당 합산
+  totalWorkPay: number;    // 근로급여만
+  totalHolidayPay: number; // 주휴수당 합산
   totalMinutes: number;
 }
 
