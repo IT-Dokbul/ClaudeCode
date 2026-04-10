@@ -1,0 +1,1 @@
+export { calculatePayroll } from './calculator';
