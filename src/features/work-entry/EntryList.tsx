@@ -41,7 +41,7 @@ export default function EntryList({ entries, onUpdate, onDelete }: Props) {
                   </span>
                 </div>
                 <div className="text-gray-500">
-                  휴게 {entry.breakMinutes}분
+                  휴게 {isFinite(entry.breakMinutes) ? Math.round(entry.breakMinutes) : '?'}분
                   {entry.daysOfWeek && entry.daysOfWeek.length > 0 && (
                     <span className="ml-2">
                       [{entry.daysOfWeek.map((d) => DAY_LABELS[d]).join('·')}]

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import type { WorkEntry } from '../../types';
 import { generateId } from '../../utils/id';
 
@@ -8,6 +8,15 @@ interface Props {
   initial?: WorkEntry;
   onSave: (entry: WorkEntry) => void;
   onCancel?: () => void;
+}
+
+function calcDailyDuration(startTime: string, endTime: string): number {
+  const [sh, sm] = startTime.split(':').map(Number);
+  const [eh, em] = endTime.split(':').map(Number);
+  let startMin = sh * 60 + sm;
+  let endMin = eh * 60 + em;
+  if (endMin <= startMin) endMin += 1440;
+  return endMin - startMin;
 }
 
 export default function EntryForm({ initial, onSave, onCancel }: Props) {
@@ -21,9 +30,22 @@ export default function EntryForm({ initial, onSave, onCancel }: Props) {
     daysOfWeek: initial?.daysOfWeek ?? [],
     memo: initial?.memo ?? '',
   });
+  const [errors, setErrors] = useState<string[]>([]);
+  const submittingRef = useRef(false);
 
   function set<K extends keyof typeof form>(key: K, value: (typeof form)[K]) {
     setForm((f) => ({ ...f, [key]: value }));
+    setErrors([]);
+  }
+
+  function handleStartDateChange(val: string) {
+    setForm((f) => ({ ...f, startDate: val, endDate: f.endDate < val ? val : f.endDate }));
+    setErrors([]);
+  }
+
+  function handleBreakChange(raw: string) {
+    const val = Math.max(0, Math.floor(Number(raw) || 0));
+    set('breakMinutes', val);
   }
 
   function toggleDay(day: number) {
@@ -33,10 +55,30 @@ export default function EntryForm({ initial, onSave, onCancel }: Props) {
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    onSave({ id: initial?.id ?? generateId(), ...form });
+    if (submittingRef.current) return;
+
+    const errs: string[] = [];
+    if (form.endDate < form.startDate) {
+      errs.push('종료일이 시작일보다 빠릅니다.');
+    }
+    const duration = calcDailyDuration(form.startTime, form.endTime);
+    const safeBreak = Math.max(0, Math.floor(form.breakMinutes));
+    if (safeBreak >= duration) {
+      errs.push(`휴게시간(${safeBreak}분)이 하루 근무시간(${duration}분)을 초과합니다.`);
+    }
+
+    if (errs.length > 0) {
+      setErrors(errs);
+      return;
+    }
+
+    submittingRef.current = true;
+    onSave({ id: initial?.id ?? generateId(), ...form, breakMinutes: safeBreak });
+    submittingRef.current = false;
   }
 
-  const inputCls = 'border border-gray-300 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 w-full';
+  const inputCls = 'border border-gray-300 bg-white text-gray-900 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 w-full';
+  const duration = calcDailyDuration(form.startTime, form.endTime);
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
@@ -44,11 +86,12 @@ export default function EntryForm({ initial, onSave, onCancel }: Props) {
         <div>
           <label className="block text-xs font-medium text-gray-600 mb-1">시작일</label>
           <input type="date" className={inputCls} value={form.startDate}
-            onChange={(e) => set('startDate', e.target.value)} required />
+            onChange={(e) => handleStartDateChange(e.target.value)} required />
         </div>
         <div>
           <label className="block text-xs font-medium text-gray-600 mb-1">종료일</label>
           <input type="date" className={inputCls} value={form.endDate}
+            min={form.startDate}
             onChange={(e) => set('endDate', e.target.value)} required />
         </div>
         <div>
@@ -62,9 +105,13 @@ export default function EntryForm({ initial, onSave, onCancel }: Props) {
             onChange={(e) => set('endTime', e.target.value)} required />
         </div>
         <div>
-          <label className="block text-xs font-medium text-gray-600 mb-1">휴게시간 (분)</label>
-          <input type="number" className={inputCls} value={form.breakMinutes} min={0}
-            onChange={(e) => set('breakMinutes', Number(e.target.value))} />
+          <label className="block text-xs font-medium text-gray-600 mb-1">
+            휴게시간 (분)
+            <span className="ml-1 text-gray-400 font-normal">최대 {duration - 1}분</span>
+          </label>
+          <input type="number" className={inputCls} value={form.breakMinutes}
+            min={0} max={duration - 1} step={1}
+            onChange={(e) => handleBreakChange(e.target.value)} />
         </div>
         <div>
           <label className="block text-xs font-medium text-gray-600 mb-1">메모</label>
@@ -94,6 +141,14 @@ export default function EntryForm({ initial, onSave, onCancel }: Props) {
           ))}
         </div>
       </div>
+
+      {errors.length > 0 && (
+        <ul className="bg-red-50 border border-red-200 rounded-md p-3 space-y-1">
+          {errors.map((err) => (
+            <li key={err} className="text-xs text-red-600">{err}</li>
+          ))}
+        </ul>
+      )}
 
       <div className="flex gap-2 justify-end pt-2">
         {onCancel && (
