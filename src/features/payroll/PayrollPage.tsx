@@ -147,7 +147,7 @@ export default function PayrollPage() {
             ].map(({ label, value, color }) => (
               <div key={label} className="bg-white border border-gray-200 rounded-lg p-4">
                 <p className="text-xs text-gray-500 mb-1">{label}</p>
-                <p className={`text-lg font-bold ${color}`}>{value}</p>
+                <p className={`text-lg font-bold break-all ${color}`}>{value}</p>
               </div>
             ))}
           </div>

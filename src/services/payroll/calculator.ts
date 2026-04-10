@@ -195,6 +195,7 @@ export function calculatePayroll(
   for (const entry of entries) {
     const start = parseISO(entry.startDate);
     const end = parseISO(entry.endDate);
+    if (end < start) continue; // 잘못된 날짜 범위 스킵
     const days = eachDayOfInterval({ start, end });
     const { startMin, endMin } = parseTimeRange(entry.startTime, entry.endTime);
 
@@ -265,6 +266,7 @@ function accumulateDay(
 ): void {
   if (startMin >= endMin) return;
   const result = calcDay(dateStr, startMin, endMin, breakMinutes, hourlyWage, settings, customHolidays);
+  if (result.totalMinutes === 0) return; // 휴게시간 초과 등으로 실근무 0분이면 스킵
   const prev = map.get(dateStr);
   if (!prev) {
     map.set(dateStr, result);
