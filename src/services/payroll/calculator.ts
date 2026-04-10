@@ -42,9 +42,6 @@ function calcDay(
   const { nightBonusRate, overtimeBonusRate, nightStartHour, nightEndHour, dailyWorkLimit } = settings;
   const dailyLimitMin = dailyWorkLimit * 60;
 
-  // 실근무 구간 (break 제거: break 는 끝에서 단순 차감)
-  const totalWorkedMin = Math.max(0, endMin - startMin - breakMinutes);
-
   let regularMinutes = 0;
   let overtimeMinutes = 0;
   let nightMinutes = 0;
