@@ -7,18 +7,19 @@ interface AppState {
   entries: WorkEntry[];
   wageRates: WageRate[];
   settings: PayrollSettings;
+  customHolidays: string[];      // 'YYYY-MM-DD' 형식
 
-  // 근무 항목
   addEntry: (entry: WorkEntry) => void;
   updateEntry: (entry: WorkEntry) => void;
   deleteEntry: (id: string) => void;
 
-  // 시급
   saveWageRate: (rate: WageRate) => void;
   deleteWageRate: (year: number) => void;
 
-  // 설정
   saveSettings: (settings: PayrollSettings) => void;
+
+  addCustomHoliday: (date: string) => void;
+  removeCustomHoliday: (date: string) => void;
 }
 
 export const useAppStore = create<AppState>()(
@@ -27,14 +28,13 @@ export const useAppStore = create<AppState>()(
       entries: [],
       wageRates: DEFAULT_WAGE_RATES,
       settings: DEFAULT_SETTINGS,
+      customHolidays: [],
 
       addEntry: (entry) =>
         set((s) => ({ entries: [...s.entries, entry] })),
 
       updateEntry: (entry) =>
-        set((s) => ({
-          entries: s.entries.map((e) => (e.id === entry.id ? entry : e)),
-        })),
+        set((s) => ({ entries: s.entries.map((e) => (e.id === entry.id ? entry : e)) })),
 
       deleteEntry: (id) =>
         set((s) => ({ entries: s.entries.filter((e) => e.id !== id) })),
@@ -54,6 +54,16 @@ export const useAppStore = create<AppState>()(
         set((s) => ({ wageRates: s.wageRates.filter((r) => r.year !== year) })),
 
       saveSettings: (settings) => set({ settings }),
+
+      addCustomHoliday: (date) =>
+        set((s) => ({
+          customHolidays: s.customHolidays.includes(date)
+            ? s.customHolidays
+            : [...s.customHolidays, date].sort(),
+        })),
+
+      removeCustomHoliday: (date) =>
+        set((s) => ({ customHolidays: s.customHolidays.filter((d) => d !== date) })),
     }),
     { name: 'wage-calc-store' },
   ),
