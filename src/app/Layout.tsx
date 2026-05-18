@@ -2,6 +2,7 @@ import { NavLink, Outlet } from 'react-router-dom';
 
 const navItems = [
   { to: '/', label: '대시보드', end: true },
+  { to: '/stores', label: '매장·직원' },
   { to: '/entries', label: '근무 입력' },
   { to: '/payroll', label: '급여 결과' },
   { to: '/wages', label: '시급 관리' },

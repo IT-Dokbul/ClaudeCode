@@ -1,5 +1,20 @@
 export type ID = string;
 
+export interface Store {
+  id: ID;
+  name: string;
+  operatingStart: string; // 'HH:mm'
+  operatingEnd: string;   // 'HH:mm'
+}
+
+export interface Employee {
+  id: ID;
+  storeId: ID;
+  name: string;
+  contractHoursPerDay: number; // 기본 9.5
+  monthlyDaysOff: number;      // 월 휴무일 수, 기본 7
+}
+
 export interface WorkEntry {
   id: ID;
   startDate: string;       // 'YYYY-MM-DD'

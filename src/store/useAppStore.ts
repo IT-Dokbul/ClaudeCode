@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { WorkEntry, WageRate, PayrollSettings } from '../types';
+import type { WorkEntry, WageRate, PayrollSettings, Store, Employee } from '../types';
 import { DEFAULT_WAGE_RATES, DEFAULT_SETTINGS } from '../types';
 
 interface AppState {
@@ -8,6 +8,8 @@ interface AppState {
   wageRates: WageRate[];
   settings: PayrollSettings;
   customHolidays: string[];      // 'YYYY-MM-DD' 형식
+  stores: Store[];
+  employees: Employee[];
 
   addEntry: (entry: WorkEntry) => void;
   updateEntry: (entry: WorkEntry) => void;
@@ -20,6 +22,14 @@ interface AppState {
 
   addCustomHoliday: (date: string) => void;
   removeCustomHoliday: (date: string) => void;
+
+  addStore: (store: Store) => void;
+  updateStore: (store: Store) => void;
+  deleteStore: (id: string) => void;
+
+  addEmployee: (employee: Employee) => void;
+  updateEmployee: (employee: Employee) => void;
+  deleteEmployee: (id: string) => void;
 }
 
 export const useAppStore = create<AppState>()(
@@ -29,6 +39,8 @@ export const useAppStore = create<AppState>()(
       wageRates: DEFAULT_WAGE_RATES,
       settings: DEFAULT_SETTINGS,
       customHolidays: [],
+      stores: [],
+      employees: [],
 
       addEntry: (entry) =>
         set((s) => ({ entries: [...s.entries, entry] })),
@@ -64,6 +76,27 @@ export const useAppStore = create<AppState>()(
 
       removeCustomHoliday: (date) =>
         set((s) => ({ customHolidays: s.customHolidays.filter((d) => d !== date) })),
+
+      addStore: (store) =>
+        set((s) => ({ stores: [...s.stores, store] })),
+
+      updateStore: (store) =>
+        set((s) => ({ stores: s.stores.map((st) => (st.id === store.id ? store : st)) })),
+
+      deleteStore: (id) =>
+        set((s) => ({
+          stores: s.stores.filter((st) => st.id !== id),
+          employees: s.employees.filter((e) => e.storeId !== id),
+        })),
+
+      addEmployee: (employee) =>
+        set((s) => ({ employees: [...s.employees, employee] })),
+
+      updateEmployee: (employee) =>
+        set((s) => ({ employees: s.employees.map((e) => (e.id === employee.id ? employee : e)) })),
+
+      deleteEmployee: (id) =>
+        set((s) => ({ employees: s.employees.filter((e) => e.id !== id) })),
     }),
     { name: 'wage-calc-store' },
   ),

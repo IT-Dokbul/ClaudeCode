@@ -5,6 +5,8 @@ import EntriesPage from './features/work-entry/EntriesPage';
 import PayrollPage from './features/payroll/PayrollPage';
 import WagesPage from './features/wage-rates/WagesPage';
 import SettingsPage from './features/settings/SettingsPage';
+import StoresPage from './features/stores/StoresPage';
+import EmployeesPage from './features/stores/EmployeesPage';
 
 export default function App() {
   return (
@@ -16,6 +18,8 @@ export default function App() {
           <Route path="payroll" element={<PayrollPage />} />
           <Route path="wages" element={<WagesPage />} />
           <Route path="settings" element={<SettingsPage />} />
+          <Route path="stores" element={<StoresPage />} />
+          <Route path="stores/:storeId" element={<EmployeesPage />} />
         </Route>
       </Routes>
     </BrowserRouter>
